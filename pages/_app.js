@@ -1,12 +1,13 @@
 import App from 'next/app';
 import { fetchUserData } from '../api';
 import Cookies from 'js-cookie';
-import Router from 'next/router'; 
 
 class MyApp extends App {
   static async getInitialProps({ Component, ctx }) {
     const { req, res } = ctx;
-    let token;
+    let token = null;
+    let user = null;
+
     if (req) {
       const cookies = req.headers.cookie;
       if (cookies) {
@@ -18,26 +19,27 @@ class MyApp extends App {
     } else {
       token = Cookies.get('token');
     }
-    let user = null;
+
     if (token) {
       try {
         user = await fetchUserData(token);
       } catch (error) {
         console.log(error.message);
-        if (res) {
-          res.writeHead(302, { Location: '/LoginPage' });
-          res.end();
-        } else {
-          Router.push('/LoginPage');
-        }
       }
     }
-    return {
-      pageProps: {
-        token,
-        user,
-      },
-    };
+
+    const requiresAuth = Component.requiresAuth;
+    const isUnauthorized = requiresAuth && !user;
+
+    if (isUnauthorized && res) {
+      res.writeHead(302, { Location: '/LoginPage' });
+      res.end();
+    } else if (isUnauthorized && typeof window !== 'undefined') {
+      window.location.href = '/LoginPage';
+    }
+
+    const pageProps = { token, user };
+    return { pageProps };
   }
 
   render() {
